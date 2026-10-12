@@ -1,0 +1,15 @@
+{
+  "host": "192.168.1.100",
+  "port": 22,
+  "windows": {
+    "username": "your_windows_username",
+    "password": "your_windows_password",
+    "key_filename": null
+  },
+  "ubuntu": {
+    "username": "your_ubuntu_username",
+    "password": "your_ubuntu_password",
+    "sudo_password": null,
+    "key_filename": null
+  }
+}

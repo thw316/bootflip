@@ -1,0 +1,15 @@
+# Credentials & Local Configuration
+config.json
+
+# Python build artifacts and cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.venv
+env/
+venv/
+
+# Editor / IDE settings
+.vscode/
+.idea/
+*.swp
