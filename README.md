@@ -176,6 +176,7 @@
 {
   "host": "192.168.1.100",
   "port": 22,
+  "timeout": 180,
   "windows": {
     "username": "your_windows_user",
     "password": "your_windows_password",
@@ -193,22 +194,34 @@
 > **欄位說明**：
 > - `host`：目標雙系統主機的 IP 位址。
 > - `port`：SSH 連接埠，預設為 22。
+> - `timeout`：重開機連線輪詢逾時秒數，預設為 180 秒（亦可在指令透過 `--timeout` 指定）。
 > - `windows` / `ubuntu`：兩端的登入憑證。若採用 SSH Key 登入，可將 `key_filename` 指向私鑰路徑，密碼設為 `null`。
 > - `sudo_password`：若 Ubuntu 端未配置免密碼 sudo，請填入此欄位，腳本將自動代入。
 
 ---
 
-### 步驟 2：執行切換
+### 步驟 2：執行切換（含開機完成與 OS 自動驗證）
+
+腳本下達重開機後，會**自動持續輪詢 SSH** 直到目標主機重開機完成、成功連線，並向系統確認目前運行的 OS 已正確切換為目標系統。
 
 #### 欲切換至 Windows：
 雙擊執行 [`reboot_to_windows.bat`](reboot_to_windows.bat)。
-* 若目前已是 Windows：腳本輸出 `Target OS is already Windows. No action taken.` 並退出。
-* 若目前是 Ubuntu：腳本透過 `efibootmgr` 設定下次開機載入 Windows 並重啟。重啟完成後即可使用 Windows 遠端桌面 (RDP) 連線。
+* 若目前已是 Windows：腳本輸出 `Target OS is already Windows. No action taken.` 並立即退出。
+* 若目前是 Ubuntu：腳本透過 `efibootmgr` 設定下次開機載入 Windows 並重啟。隨後**自動等待並輪詢 SSH**，確認 Windows 已經開機且 OpenSSH 上線，最後提示成功訊息。此時即可立刻透過 Windows 遠端桌面 (RDP) 連線。
 
 #### 欲切換至 Ubuntu：
 雙擊執行 [`reboot_to_ubuntu.bat`](reboot_to_ubuntu.bat)。
-* 若目前已是 Ubuntu：腳本輸出 `Target OS is already Ubuntu. No action taken.` 並退出。
-* 若目前是 Windows：腳本透過 `bcdedit` 設定下次開機載入 Ubuntu 並重啟。重啟完成後即可使用 SSH 連線。
+* 若目前已是 Ubuntu：腳本輸出 `Target OS is already Ubuntu. No action taken.` 並立即退出。
+* 若目前是 Windows：腳本透過 `bcdedit` 設定下次開機載入 Ubuntu 並重啟。隨後**自動等待並輪詢 SSH**，確認 Ubuntu 已經開機且 SSH 上線，最後提示成功訊息。此時即可立即開始 SSH 工作。
+
+#### 進階執行參數（可於命令列傳入）：
+```cmd
+# 指定等待逾時時間為 300 秒
+python switch_os.py --target windows --timeout 300
+
+# 不等待重開機結果（下達重啟後直接結束，即原本的 fire-and-forget 行為）
+python switch_os.py --target ubuntu --no-wait
+```
 
 ---
 

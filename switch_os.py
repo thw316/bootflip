@@ -74,7 +74,7 @@ def detect_os(client):
     return "unknown"
 
 
-def try_connect(host, port, username, password=None, key_filename=None):
+def try_connect(host, port, username, password=None, key_filename=None, timeout=10):
     """Attempt an SSH connection using given credentials."""
     client = paramiko.SSHClient()
     # Ignore host key mismatch between Windows and Linux on the same IP
@@ -87,7 +87,7 @@ def try_connect(host, port, username, password=None, key_filename=None):
             username=username,
             password=password,
             key_filename=key_filename,
-            timeout=10,
+            timeout=timeout,
             look_for_keys=False if password and not key_filename else True,
             allow_agent=False,
         )
@@ -216,6 +216,62 @@ def switch_to_ubuntu_from_windows(client):
     print("[SUCCESS] Remote system is rebooting into Ubuntu!")
 
 
+def wait_for_reboot_and_verify(config, target_os, timeout=180, poll_interval=5, initial_wait=10):
+    """
+    Poll SSH after reboot until remote machine comes back online and target OS is confirmed.
+    """
+    host = config.get("host")
+    port = config.get("port", 22)
+    target_cfg = config.get(target_os, {})
+    other_os = "ubuntu" if target_os == "windows" else "windows"
+    other_cfg = config.get(other_os, {})
+
+    print("\n" + "=" * 60)
+    print(f"[*] Waiting for remote host ({host}) to reboot into {target_os.upper()}...")
+    print(f"[*] Max timeout: {timeout}s | Giving host {initial_wait}s to initiate shutdown...")
+    print("=" * 60)
+
+    time.sleep(initial_wait)
+
+    start_time = time.time()
+    while True:
+        elapsed = int(time.time() - start_time)
+        if elapsed >= timeout:
+            print(f"\n[ERROR] Timeout ({timeout}s) exceeded while waiting for {target_os.upper()} to boot.")
+            print("[ERROR] Please verify the machine status manually.")
+            sys.exit(1)
+
+        # Try connecting with target OS credentials first, then fallback to other OS
+        client = None
+        for os_name, cfg in [(target_os, target_cfg), (other_os, other_cfg)]:
+            u = cfg.get("username")
+            p = cfg.get("password")
+            k = cfg.get("key_filename")
+            if not u:
+                continue
+            client, _ = try_connect(host, port, u, p, k, timeout=4)
+            if client:
+                break
+
+        if client is not None:
+            try:
+                active_os = detect_os(client)
+                if active_os == target_os:
+                    print(f"\n[+] [Elapsed: {elapsed}s] SSH connection established on {host}:{port}!")
+                    print(f"[+] Verified active OS is {target_os.upper()}!")
+                    print(f"[SUCCESS] Remote dual-boot switch to {target_os.upper()} successfully verified!")
+                    client.close()
+                    return True
+                else:
+                    print(f"[-] [Elapsed: {elapsed}s] Host is responsive, but still running {active_os.upper()}. Waiting...")
+            finally:
+                client.close()
+        else:
+            print(f"[-] [Elapsed: {elapsed}s / {timeout}s] Host is rebooting... Retrying in {poll_interval}s")
+
+        time.sleep(poll_interval)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Switch Dual OS remotely via SSH.")
     parser.add_argument(
@@ -229,12 +285,24 @@ def main():
         default="config.json",
         help="Path to configuration file (default: config.json in script directory).",
     )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=None,
+        help="Reboot verification timeout in seconds (default: 180).",
+    )
+    parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="Do not wait for reboot and OS verification.",
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
 
     client, profile = connect_remote(config)
 
+    switched = False
     try:
         current_os = detect_os(client)
         print(f"[+] Current active OS detected: {current_os.upper()}")
@@ -250,6 +318,7 @@ def main():
             elif current_os == "ubuntu":
                 print("[*] Transitioning from Ubuntu to Windows...")
                 switch_to_windows_from_ubuntu(client, config)
+                switched = True
         elif args.target == "ubuntu":
             if current_os == "ubuntu":
                 print("[INFO] Target OS is already Ubuntu. No action taken.")
@@ -257,9 +326,14 @@ def main():
             elif current_os == "windows":
                 print("[*] Transitioning from Windows to Ubuntu...")
                 switch_to_ubuntu_from_windows(client)
+                switched = True
 
     finally:
         client.close()
+
+    if switched and not args.no_wait:
+        wait_timeout = args.timeout or config.get("timeout", 180)
+        wait_for_reboot_and_verify(config, args.target, timeout=wait_timeout)
 
 
 if __name__ == "__main__":

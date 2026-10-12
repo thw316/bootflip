@@ -1,6 +1,7 @@
 {
   "host": "192.168.1.100",
   "port": 22,
+  "timeout": 180,
   "windows": {
     "username": "your_windows_username",
     "password": "your_windows_password",
