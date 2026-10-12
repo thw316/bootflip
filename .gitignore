@@ -1,5 +1,6 @@
 # Credentials & Local Configuration
 config.json
+*.bak
 
 # Python build artifacts and cache
 __pycache__/
