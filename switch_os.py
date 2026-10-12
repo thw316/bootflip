@@ -165,8 +165,6 @@ def switch_to_windows_from_ubuntu(client, config):
     except Exception:
         pass
 
-    print("[SUCCESS] Remote system is rebooting into Windows!")
-
 
 def switch_to_ubuntu_from_windows(client):
     """
@@ -213,8 +211,6 @@ def switch_to_ubuntu_from_windows(client):
     except Exception:
         pass
 
-    print("[SUCCESS] Remote system is rebooting into Ubuntu!")
-
 
 def wait_for_reboot_and_verify(config, target_os, timeout=180, poll_interval=5, initial_wait=10):
     """
@@ -226,14 +222,12 @@ def wait_for_reboot_and_verify(config, target_os, timeout=180, poll_interval=5, 
     other_os = "ubuntu" if target_os == "windows" else "windows"
     other_cfg = config.get(other_os, {})
 
-    print("\n" + "=" * 60)
-    print(f"[*] Waiting for remote host ({host}) to reboot into {target_os.upper()}...")
+    print(f"\n[*] Waiting for remote host ({host}) to reboot into {target_os.upper()}...")
     print(f"[*] Max timeout: {timeout}s | Giving host {initial_wait}s to initiate shutdown...")
-    print("=" * 60)
-
-    time.sleep(initial_wait)
 
     start_time = time.time()
+    time.sleep(initial_wait)
+
     while True:
         elapsed = int(time.time() - start_time)
         if elapsed >= timeout:
@@ -259,7 +253,7 @@ def wait_for_reboot_and_verify(config, target_os, timeout=180, poll_interval=5, 
                 if active_os == target_os:
                     print(f"\n[+] [Elapsed: {elapsed}s] SSH connection established on {host}:{port}!")
                     print(f"[+] Verified active OS is {target_os.upper()}!")
-                    print(f"[SUCCESS] Remote dual-boot switch to {target_os.upper()} successfully verified!")
+                    print(f"[SUCCESS] Remote system is rebooting into {target_os.capitalize()}!")
                     client.close()
                     return True
                 else:
@@ -331,9 +325,12 @@ def main():
     finally:
         client.close()
 
-    if switched and not args.no_wait:
-        wait_timeout = args.timeout or config.get("timeout", 180)
-        wait_for_reboot_and_verify(config, args.target, timeout=wait_timeout)
+    if switched:
+        if args.no_wait:
+            print(f"[SUCCESS] Remote system is rebooting into {args.target.capitalize()} (polling skipped)!")
+        else:
+            wait_timeout = args.timeout or config.get("timeout", 180)
+            wait_for_reboot_and_verify(config, args.target, timeout=wait_timeout)
 
 
 if __name__ == "__main__":
